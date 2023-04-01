@@ -36,16 +36,77 @@ where continent is null
 group by location
 Order by totaldeathcount desc
 
+Create View totaldeath as
+Select location, max(cast(total_deaths as int)) as totaldeathcount
+From CovidProject..Coviddeath
+where continent is null
+group by location
+Order by totaldeathcount desc
+
+
 Select SUM(new_cases) as total_cases, Sum(Cast(new_deaths as int)) as total_deaths, SUM(cast(new_deaths as int)) / sum(new_cases) *100 as deathpercentage
 From CovidProject..Coviddeath
 where continent is not null
 --group by date
 Order by 1,2
 
-
-Select *
+--looking at total pop vs vaccinated
+Select dea.continent, dea.location, dea.date,dea.population, vac.new_vaccinations, SUM(convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location Order by dea.location, dea.date) as rollingvaccinated
 From CovidProject..Coviddeath dea
-join CovidProject..CovidVaccine vac
+Join CovidProject..CovidVaccine vac
 	on dea.location = vac.location
-	and dea.date = dea.date
+	and dea.date = vac.date
+where dea.continent is not null
+order by 2,3
+
+--CTE
+With PopvsVac(Continent, Location,Date, Population, new_vac, rollingvaccinated)
+as
+(
+Select dea.continent, dea.location, dea.date,dea.population, vac.new_vaccinations, SUM(convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location Order by dea.location, dea.date) as rollingvaccinated
+
+From CovidProject..Coviddeath dea
+Join CovidProject..CovidVaccine vac
+	on dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null
+--order by 2,3
+)
+Select *, (rollingvaccinated/Population)*100
+From PopvsVac
+
+
+Create table	#PercentpopVac
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+population numeric,
+new_vaccinations numeric,
+rollingvac numeric)
+
+Insert into #PercentpopVac
+Select dea.continent, dea.location, dea.date,dea.population, vac.new_vaccinations, SUM(convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location Order by dea.location, dea.date) as rollingvaccinated
+
+From CovidProject..Coviddeath dea
+Join CovidProject..CovidVaccine vac
+	on dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null
+--order by 2,3
+
+Select *, (rollingvac/Population)*100
+From #PercentpopVac
+
+
+--create view
+Create View percentpopvaccinated as
+Select dea.continent, dea.location, dea.date,dea.population, vac.new_vaccinations, SUM(convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location Order by dea.location, dea.date) as rollingvaccinated
+
+From CovidProject..Coviddeath dea
+Join CovidProject..CovidVaccine vac
+	on dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null
+--order by 2,3
 
